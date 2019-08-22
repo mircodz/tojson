@@ -55,7 +55,11 @@ json xml2json(std::string xml)
 {
 	json j;
 	rapidxml::xml_document<> doc;
-	doc.parse<0>((char*)(xml.c_str()));
+	try {
+		doc.parse<0>((char*)(xml.c_str()));
+	} catch(...) {
+		return j;
+	}
 	rapidxml::xml_node<> *root = doc.first_node();
 	j[root->name()] = _xml2json(root);
 	return j;
