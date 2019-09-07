@@ -2,13 +2,12 @@
 #define XML2JSON_H
 
 #include <string>
-#include <iostream>
 
 #include "rapidxml.hpp"
 #include "json.hpp"
 using json = nlohmann::json;
 
-inline json xml2json(std::string xml);
+inline json xml2json(std::string const& xml);
 inline json _xml2json(rapidxml::xml_node<> *root);
 
 /**
@@ -51,7 +50,7 @@ json _xml2json(rapidxml::xml_node<> *root)
 /**
  * Wrapper function for the xml to json conversion.
  */
-json xml2json(std::string xml)
+json xml2json(const std::string& xml)
 {
 	json j;
 	rapidxml::xml_document<> doc;
