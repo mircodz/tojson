@@ -1,8 +1,3 @@
-tojson is a tiny (127 sloc), header only library to convert xml and yaml documents into nlohmann::json objects.
-
-### minimal functioning example
-
-```c++
 #include <iostream>
 #include "tojson.hpp"
 
@@ -18,10 +13,3 @@ int main()
 
 	return 0;
 }
-```
-
-### dependencies
-
-- rapidxml
-- yaml-cpp
-- nlohmann::json
