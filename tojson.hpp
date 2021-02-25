@@ -5,18 +5,18 @@
 #include <fstream>
 
 #include "json.hpp"
-#include "rapidxml.hpp"
+#include "rapidxml_ext.hpp"
 
 #if __has_cpp_attribute(nodiscard)
-	#define TOJSON_NODISCARD [[nodiscard]]
+#define TOJSON_NODISCARD [[nodiscard]]
 #else
-	#define TOJSON_NODISCARD
+#define TOJSON_NODISCARD
 #endif
 
 namespace tojson {
-
 namespace detail {
 
+/// \todo refactor and pass nlohmann::json down by reference instead of returning it
 inline nlohmann::json xml2json(const rapidxml::xml_node<> *root) {
 	nlohmann::json j{};
 	std::unordered_map<std::string, int> occurrence{};
@@ -36,7 +36,7 @@ inline nlohmann::json xml2json(const rapidxml::xml_node<> *root) {
 				n[key] = xml2json(node);
 			else
 				n["@text"] = node->value();
-			// iterate through the attributes
+			// toyaml through the attributes
 			for (auto *attr = node->first_attribute(); attr; attr = attr->next_attribute())
 				n[key][attr->name()] = attr->value();
 			j[key].emplace_back(n[key]);
@@ -45,7 +45,7 @@ inline nlohmann::json xml2json(const rapidxml::xml_node<> *root) {
 				j[key] = xml2json(node);
 			else
 				j["@text"] = node->value();
-			// iterate through the attributes
+			// toyaml through the attributes
 			for (auto *attr = node->first_attribute(); attr; attr = attr->next_attribute())
 				j[key][attr->name()] = attr->value();
 		}
@@ -54,14 +54,13 @@ inline nlohmann::json xml2json(const rapidxml::xml_node<> *root) {
 	return j;
 }
 
+/// \todo refactor and pass nlohmann::json down by reference instead of returning it
 inline nlohmann::json yaml2json(const YAML::Node &root) {
 	nlohmann::json j{};
 
 	switch (root.Type()) {
-	case YAML::NodeType::Null:
-		break;
-	case YAML::NodeType::Scalar:
-		return root.as<std::string>();
+	case YAML::NodeType::Null: break;
+	case YAML::NodeType::Scalar: return root.as<std::string>();
 	case YAML::NodeType::Sequence:
 		for (auto &&node : root)
 			j.emplace_back(yaml2json(node));
@@ -75,13 +74,74 @@ inline nlohmann::json yaml2json(const YAML::Node &root) {
 	return j;
 }
 
+/// \todo handle @text entries better
+inline void toyaml(const nlohmann::json &j, YAML::Emitter &e) {
+	for (auto it = j.begin(); it != j.end(); ++it) {
+		if (it->is_object()) {
+			e << YAML::Key << it.key() << YAML::Value << YAML::BeginMap;
+			toyaml(*it, e);
+			e << YAML::EndMap;
+		} else if (it->is_array()) {
+			e << YAML::Key << it.key() << YAML::Value << YAML::BeginSeq;
+			toyaml(it.value(), e);
+			e << YAML::EndSeq;
+		} else {
+			if (it.key() == "@text") {
+				e << YAML::Value << it.value().get<std::string>();
+			} else {
+				e << YAML::Key << it.key() << YAML::Value << it.value().get<std::string>();
+			}
+		}
+	}
+}
+
+// Forward declaration required here for circular dipedency.
+inline void toxml(const nlohmann::json &j, rapidxml::xml_document<> &doc, rapidxml::xml_node<> *parent);
+
+/// \todo handle @text entries better
+inline void toxml(const nlohmann::json &j,
+                  rapidxml::xml_document<> &doc,
+                  rapidxml::xml_node<> *parent,
+                  const std::string &key) {
+  // Not the prettiest of designs, but it works fine.
+	for (auto it = j.begin(); it != j.end(); ++it) {
+		if (it->is_object()) {
+			auto *node = doc.allocate_node(rapidxml::node_element, doc.allocate_string(it.key().data()));
+			detail::toxml(*it, doc, node);
+			parent->append_node(node);
+		} else if (it->is_array()) {
+			detail::toxml(*it, doc, parent, key);
+		} else {
+			auto *node = doc.allocate_node(rapidxml::node_element, doc.allocate_string(key.data()));
+			node->value(doc.allocate_string(it.value().get<std::string>().data()));
+			parent->append_node(node);
+		}
+	}
+}
+
+/// \todo handle @text entries better
+inline void toxml(const nlohmann::json &j, rapidxml::xml_document<> &doc, rapidxml::xml_node<> *parent) {
+	for (auto it = j.begin(); it != j.end(); ++it) {
+		if (it->is_object()) {
+			auto *node = doc.allocate_node(rapidxml::node_element, doc.allocate_string(it.key().data()));
+			detail::toxml(*it, doc, node);
+			parent->append_node(node);
+		} else if (it->is_array()) {
+			detail::toxml(*it, doc, parent, it.key());
+		} else {
+			auto *node = doc.allocate_node(rapidxml::node_element, doc.allocate_string(it.key().data()));
+			node->value(doc.allocate_string(it.value().get<std::string>().data()));
+			parent->append_node(node);
+		}
+	}
+}
+
 }  // namespace detail
 
 /// \brief Convert XML string to JSON.
 TOJSON_NODISCARD inline nlohmann::json xml2json(const std::string &str) {
 	nlohmann::json j{};
 	rapidxml::xml_document<> doc{};
-
 	doc.parse<0>(const_cast<char *>(str.data()));
 
 	auto *root = doc.first_node();
@@ -110,4 +170,47 @@ TOJSON_NODISCARD inline nlohmann::json loadxml(const std::string &filepath) {
 	return xml2json(str);
 }
 
+namespace emitters {
+
+/// \brief Generate string representation of json as an YAML document.
+TOJSON_NODISCARD inline std::string toyaml(const nlohmann::json &j) {
+	YAML::Emitter e;
+	e << YAML::BeginDoc;
+	if (j.is_object()) {
+		e << YAML::BeginMap;
+		detail::toyaml(j, e);
+		e << YAML::EndMap;
+	} else if (j.is_array()) {
+		e << YAML::BeginSeq;
+		detail::toyaml(j, e);
+		e << YAML::EndSeq;
+	}
+	e << YAML::EndDoc;
+	return e.c_str();
+}
+
+/// \brief Generate string representation of json as an XML document.
+/// \param j Json object to convert, must have a single root
+/// \throws std::runtime_error if the object have more than one root
+TOJSON_NODISCARD inline std::string toxml(const nlohmann::json &j) {
+	rapidxml::xml_document<> doc;
+	auto *decl = doc.allocate_node(rapidxml::node_declaration);
+	decl->append_attribute(doc.allocate_attribute("version", "1.0"));
+	decl->append_attribute(doc.allocate_attribute("encoding", "utf-8"));
+	doc.append_node(decl);
+
+	if (j.is_object() && j.size() == 1) {
+		auto *root = doc.allocate_node(rapidxml::node_element, doc.allocate_string(j.begin().key().data()));
+		detail::toxml(j.begin().value(), doc, root);
+		doc.append_node(root);
+	} else {
+		throw std::runtime_error("json must have a single root node");
+	}
+
+	std::string xml_as_string;
+	rapidxml::print(std::back_inserter(xml_as_string), doc);
+	return xml_as_string;
+}
+
+}  // namespace emitters
 }  // namespace tojson
