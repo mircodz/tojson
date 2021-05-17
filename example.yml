@@ -3,6 +3,11 @@ details:
   job: Developer
   skill: Elite
   employed: True
+  random:
+    - Hi
+    - 48
+    - 0.5
+    - True
   foods:
       - Apple
       - Orange
