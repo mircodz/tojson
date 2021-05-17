@@ -4,19 +4,21 @@ tojson is a tiny (127 sloc), header only library to convert xml and yaml documen
 
 ```c++
 #include <iostream>
+
 #include "tojson.hpp"
 
-int main()
-{
+int main() {
 	using namespace tojson;
+	using namespace tojson::emitters;
 
-	json a = loadxml("./example.xml");
-	json b = loadyaml("./example.yml");
+	nlohmann::json a = loadxml("./example.xml");
+	nlohmann::json b = loadyaml("./example.yml");
 
-	std::cout << a.dump(1) << std::endl;
-	std::cout << b.dump(1) << std::endl;
+	std::cout << a.dump() << std::endl;
+	std::cout << b.dump() << std::endl;
 
-	return 0;
+	std::cout << toyaml(a) << std::endl;
+	std::cout << toxml(b) << std::endl;
 }
 ```
 
