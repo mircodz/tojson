@@ -1,11 +1,29 @@
 #pragma once
 
 #include <yaml-cpp/yaml.h>
+#include <rapidxml.hpp>
+
+#include "json.hpp"
 
 #include <fstream>
 
-#include "json.hpp"
-#include "rapidxml_ext.hpp"
+/* Adding declarations to make it compatible with gcc 4.7 and greater */
+#if __GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__ > 40700
+namespace rapidxml {
+namespace internal {
+template <class OutIt, class Ch> inline OutIt print_children(OutIt out, const xml_node<Ch>* node, int flags, int indent);
+template <class OutIt, class Ch> inline OutIt print_attributes(OutIt out, const xml_node<Ch>* node, int flags);
+template <class OutIt, class Ch> inline OutIt print_data_node(OutIt out, const xml_node<Ch>* node, int flags, int indent);
+template <class OutIt, class Ch> inline OutIt print_cdata_node(OutIt out, const xml_node<Ch>* node, int flags, int indent);
+template <class OutIt, class Ch> inline OutIt print_element_node(OutIt out, const xml_node<Ch>* node, int flags, int indent);
+template <class OutIt, class Ch> inline OutIt print_declaration_node(OutIt out, const xml_node<Ch>* node, int flags, int indent);
+template <class OutIt, class Ch> inline OutIt print_comment_node(OutIt out, const xml_node<Ch>* node, int flags, int indent);
+template <class OutIt, class Ch> inline OutIt print_doctype_node(OutIt out, const xml_node<Ch>* node, int flags, int indent);
+template <class OutIt, class Ch> inline OutIt print_pi_node(OutIt out, const xml_node<Ch>* node, int flags, int indent);
+}  // namespace internal
+}  // namespace rapidxml
+#include "rapidxml_print.hpp"
+#endif
 
 #if __has_cpp_attribute(nodiscard)
 #define TOJSON_NODISCARD [[nodiscard]]
