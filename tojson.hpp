@@ -54,13 +54,27 @@ inline nlohmann::json xml2json(const rapidxml::xml_node<> *root) {
 	return j;
 }
 
+inline nlohmann::json parse_scalar(const YAML::Node &node) {
+	int i;
+	double d;
+	bool b;
+	std::string s;
+
+	if (YAML::convert<int>::decode(node, i)) return i;
+	if (YAML::convert<double>::decode(node, d)) return d;
+	if (YAML::convert<bool>::decode(node, b)) return b;
+	if (YAML::convert<std::string>::decode(node, s)) return s;
+
+	return nullptr;
+}
+
 /// \todo refactor and pass nlohmann::json down by reference instead of returning it
 inline nlohmann::json yaml2json(const YAML::Node &root) {
 	nlohmann::json j{};
 
 	switch (root.Type()) {
 	case YAML::NodeType::Null: break;
-	case YAML::NodeType::Scalar: return root.as<std::string>();
+	case YAML::NodeType::Scalar: return parse_scalar(root);
 	case YAML::NodeType::Sequence:
 		for (auto &&node : root)
 			j.emplace_back(yaml2json(node));
@@ -98,6 +112,15 @@ inline void toyaml(const nlohmann::json &j, YAML::Emitter &e) {
 // Forward declaration required here for circular dipedency.
 inline void toxml(const nlohmann::json &j, rapidxml::xml_document<> &doc, rapidxml::xml_node<> *parent);
 
+inline std::string repr(const nlohmann::json &j) {
+	if (j.is_number()) return std::to_string(j.get<int>());
+	if (j.is_boolean()) return j.get<bool>() ? "true" : "false";
+	if (j.is_number_float()) return std::to_string(j.get<double>());
+	if (j.is_string()) return j.get<std::string>();
+	std::runtime_error("invalid type");
+	return "";
+}
+
 /// \todo handle @text entries better
 inline void toxml(const nlohmann::json &j,
                   rapidxml::xml_document<> &doc,
@@ -113,7 +136,7 @@ inline void toxml(const nlohmann::json &j,
 			detail::toxml(*it, doc, parent, key);
 		} else {
 			auto *node = doc.allocate_node(rapidxml::node_element, doc.allocate_string(key.data()));
-			node->value(doc.allocate_string(it.value().get<std::string>().data()));
+			node->value(doc.allocate_string(repr(it.value()).data()));
 			parent->append_node(node);
 		}
 	}
@@ -130,7 +153,7 @@ inline void toxml(const nlohmann::json &j, rapidxml::xml_document<> &doc, rapidx
 			detail::toxml(*it, doc, parent, it.key());
 		} else {
 			auto *node = doc.allocate_node(rapidxml::node_element, doc.allocate_string(it.key().data()));
-			node->value(doc.allocate_string(it.value().get<std::string>().data()));
+			node->value(doc.allocate_string(repr(it.value()).data()));
 			parent->append_node(node);
 		}
 	}
