@@ -121,7 +121,11 @@ inline void toyaml(const nlohmann::json &j, YAML::Emitter &e) {
 			if (it.key() == "@text") {
 				e << YAML::Value << it.value().get<std::string>();
 			} else {
-				e << YAML::Key << it.key() << YAML::Value << it.value().get<std::string>();
+				e << YAML::Key << it.key() << YAML::Value;
+				if (it->type() == nlohmann::json::value_t::string)
+					e << it.value().get<std::string>();
+				else
+					e << it->dump();
 			}
 		}
 	}
